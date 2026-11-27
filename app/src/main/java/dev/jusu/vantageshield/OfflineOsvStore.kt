@@ -69,7 +69,7 @@ object OfflineOsvStore {
             val ids = entry.optJSONArray("advisoryIds") ?: continue
             for (index in 0 until ids.length()) ids.optString(index).takeIf(String::isNotBlank)?.let(referencedIds::add)
         }
-        records.keys().asSequence().filterNot(referencedIds::contains).toList().forEach(records::remove)
+        records.keys().asSequence().filterNot(referencedIds::contains).toList().forEach { records.remove(it) }
 
         payload.put("schemaVersion", SCHEMA_VERSION)
             .put("source", "OSV.dev API over HTTPS")
@@ -106,6 +106,9 @@ object OfflineOsvStore {
         require(target.exists()) { "OFFLINE CACHE UNKNOWN: no OSV records have been cached yet. Run an online OSV check first." }
         val payload = readVerifiedPayload(target)
         require(payload.optInt("schemaVersion", -1) == SCHEMA_VERSION) { "OFFLINE CACHE UNKNOWN: unsupported cache schema." }
+        require(payload.optString("source") == "OSV.dev API over HTTPS") {
+            "OFFLINE CACHE UNKNOWN: unrecognized advisory data source."
+        }
         val packages = payload.optJSONObject("packages") ?: error("OFFLINE CACHE UNKNOWN: package coverage is missing.")
         val records = payload.optJSONObject("records") ?: error("OFFLINE CACHE UNKNOWN: advisory records are missing.")
         val missing = mutableListOf<String>()
@@ -118,14 +121,18 @@ object OfflineOsvStore {
                 missing += dependency.purl
             } else {
                 val checked = runCatching { Instant.parse(entry.optString("checkedAt")) }.getOrNull()
-                if (checked == null) {
+                val ids = entry.optJSONArray("advisoryIds")
+                if (checked == null || ids == null || checked.isAfter(now.plus(Duration.ofHours(24)))) {
                     missing += dependency.purl
                 } else {
                     checkTimes += checked
-                    val ids = entry.optJSONArray("advisoryIds")
-                    if (ids != null) for (i in 0 until ids.length()) {
+                    for (i in 0 until ids.length()) {
                         val id = ids.optString(i)
-                        if (id.isNotBlank()) matchedIds.getOrPut(id) { mutableListOf() }.add(dependency.purl)
+                        if (!id.matches(Regex("[A-Za-z0-9._-]{1,128}")) || records.optString(id).isBlank()) {
+                            missing += dependency.purl
+                            break
+                        }
+                        matchedIds.getOrPut(id) { mutableListOf() }.add(dependency.purl)
                     }
                 }
             }
@@ -143,7 +150,9 @@ object OfflineOsvStore {
         val advisories = matchedIds.map { (id, purls) ->
             val raw = records.optString(id)
             require(raw.isNotBlank()) { "OFFLINE CACHE UNKNOWN: cached advisory record $id is missing." }
-            OsvClient.parseAdvisory(JSONObject(raw), id, purls.distinct()) 
+            val record = JSONObject(raw)
+            require(record.optString("id") == id) { "OFFLINE CACHE UNKNOWN: cached advisory identity mismatch." }
+            OsvClient.parseAdvisory(record, id, purls.distinct())
         }.filterNotNull().distinctBy { it.id }.sortedBy { it.id }
 
         val oldest = checkTimes.minOrNull() ?: Instant.EPOCH
