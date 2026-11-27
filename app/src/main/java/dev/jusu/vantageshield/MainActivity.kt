@@ -33,6 +33,10 @@ class MainActivity : ComponentActivity() {
         var offlineResult by remember { mutableStateOf<OfflineOsvCheck?>(null) }
         var offlineError by remember { mutableStateOf<String?>(null) }
         var offlineBusy by remember { mutableStateOf(false) }
+        var mavenDbStatus by remember { mutableStateOf<MavenDatabaseStatus?>(null) }
+        var mavenDbCheck by remember { mutableStateOf<MavenDatabaseCheck?>(null) }
+        var mavenDbError by remember { mutableStateOf<String?>(null) }
+        var mavenDbBusy by remember { mutableStateOf(false) }
         var checks by remember { mutableStateOf(DeviceChecks.run(this)) }
         var busy by remember { mutableStateOf(false) }
         var showTerminal by remember { mutableStateOf(false) }
@@ -190,6 +194,60 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier.fillMaxWidth()
                                     ) { Text(if (offlineBusy) "CHECKING LOCAL CACHE…" else "CHECK OFFLINE ADVISORY CACHE") }
                                     Text("Offline cache covers only exact package versions previously checked online. It is not the full Maven vulnerability database.", style = MaterialTheme.typography.bodySmall)
+                                    OutlinedButton(
+                                        onClick = {
+                                            mavenDbBusy = true
+                                            mavenDbError = null
+                                            mavenDbCheck = null
+                                            scope.launch {
+                                                try {
+                                                    mavenDbStatus = withContext(Dispatchers.IO) { MavenOsvDatabase.download(filesDir) }
+                                                } catch (e: Exception) {
+                                                    mavenDbError = e.message ?: "Full Maven database update failed."
+                                                } finally { mavenDbBusy = false }
+                                            }
+                                        },
+                                        enabled = !busy && !osvBusy && !offlineBusy && !mavenDbBusy,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text(if (mavenDbBusy) "DOWNLOADING MAVEN DATABASE…" else "DOWNLOAD / UPDATE FULL MAVEN OSV DATABASE") }
+                                    OutlinedButton(
+                                        onClick = {
+                                            mavenDbBusy = true
+                                            mavenDbError = null
+                                            mavenDbCheck = null
+                                            scope.launch {
+                                                try {
+                                                    mavenDbCheck = withContext(Dispatchers.IO) {
+                                                        MavenOsvDatabase.check(filesDir, r.dependencies)
+                                                    }
+                                                    mavenDbStatus = mavenDbCheck?.status
+                                                } catch (e: Exception) {
+                                                    mavenDbError = e.message ?: "Local Maven database check failed."
+                                                } finally { mavenDbBusy = false }
+                                            }
+                                        },
+                                        enabled = !busy && !osvBusy && !offlineBusy && !mavenDbBusy && r.dependencies.isNotEmpty(),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text(if (mavenDbBusy) "CHECKING FULL LOCAL DATABASE…" else "CHECK FULL MAVEN DATABASE OFFLINE") }
+                                    Text("The full Maven archive is downloaded only when requested. Offline matching uses Maven version ordering; unsupported or unreadable range records are reported as incomplete coverage.", style = MaterialTheme.typography.bodySmall)
+                                    if (mavenDbBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                                    mavenDbError?.let { Text("FULL MAVEN DATABASE UNKNOWN • " + it, color = MaterialTheme.colorScheme.error) }
+                                    mavenDbStatus?.let { db ->
+                                        Text("MAVEN OSV DATABASE • ${db.recordCount} records • ${db.archiveBytes / (1024 * 1024)} MiB • downloaded ${db.downloadedAt}", style = MaterialTheme.typography.bodySmall)
+                                        if (db.stale) Text("STALE DATABASE • Older than 30 days. Update before relying on results.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                        Text("Archive SHA-256: " + db.sha256, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                    mavenDbCheck?.let { db ->
+                                        Text("FULL OFFLINE MATCH • ${db.advisories.size} advisory record(s) matched against ${db.scannedPackages} exact Maven package(s).", style = MaterialTheme.typography.bodySmall)
+                                        if (!db.coverageComplete) Text("COVERAGE INCOMPLETE • ${db.unsupportedRangeRecords} matching advisory range(s) could not be evaluated; no-match is not proof of safety.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                        if (db.advisories.isEmpty() && db.coverageComplete) Text("No matching advisory records in this database snapshot. This is not proof of safety.", style = MaterialTheme.typography.bodySmall)
+                                        db.advisories.forEach { advisory ->
+                                            Text("FULL DB • ${advisory.id}: ${advisory.summary}", style = MaterialTheme.typography.bodySmall)
+                                            if (advisory.matchedComponents.isNotEmpty()) Text("Matched: " + advisory.matchedComponents.joinToString(), style = MaterialTheme.typography.bodySmall)
+                                            advisory.affected.forEach { Text("Affected: " + it, style = MaterialTheme.typography.bodySmall) }
+                                            advisory.references.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                                        }
+                                    }
                                     if (offlineBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
                                     offlineError?.let { Text("OFFLINE STATUS UNKNOWN • " + it, color = MaterialTheme.colorScheme.error) }
                                     offlineResult?.let { cached ->
