@@ -16,8 +16,8 @@ class DependencyInventoryTest {
     @Test fun rejectsPathCoordinateMismatchAndMissingVersion() {
         val mismatch = "META-INF/maven/com/example/library/pom.properties" to
             "groupId=com.attacker\nartifactId=library\nversion=1.0.0\n".toByteArray()
-        val missing = "META-INF/maven/com/example/library/pom.properties" to
-            "groupId=com.example\nartifactId=library\n".toByteArray()
+        val missing = "META-INF/maven/com/example/other/pom.properties" to
+            "groupId=com.example\nartifactId=other\n".toByteArray()
         assertTrue(DependencyInventory.parse(mapOf(mismatch, missing)).isEmpty())
     }
 
