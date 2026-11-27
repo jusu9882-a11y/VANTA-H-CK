@@ -69,7 +69,13 @@ object OfflineOsvStore {
             val ids = entry.optJSONArray("advisoryIds") ?: continue
             for (index in 0 until ids.length()) ids.optString(index).takeIf(String::isNotBlank)?.let(referencedIds::add)
         }
-        records.keys().asSequence().filterNot(referencedIds::contains).toList().forEach { records.remove(it) }
+        val orphanedRecordIds = mutableListOf<String>()
+        val recordKeys = records.keys()
+        while (recordKeys.hasNext()) {
+            val id = recordKeys.next()
+            if (id !in referencedIds) orphanedRecordIds += id
+        }
+        orphanedRecordIds.forEach { records.remove(it) }
 
         payload.put("schemaVersion", SCHEMA_VERSION)
             .put("source", "OSV.dev API over HTTPS")
