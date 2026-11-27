@@ -2,8 +2,6 @@ package dev.jusu.vantageshield
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
@@ -14,7 +12,9 @@ data class OsvAdvisory(
     val summary: String,
     val modified: String?,
     val aliases: List<String>,
-    val references: List<String>
+    val references: List<String>,
+    val affected: List<String>,
+    val severity: String?
 )
 
 data class OsvCheckResult(
@@ -63,20 +63,51 @@ object OsvClient {
         }
 
         val truncated = unique.size > MAX_PACKAGES || ids.size > MAX_ADVISORIES
-        val advisories = ids.take(MAX_ADVISORIES).map { id ->
-            val record = request(VULN_URL + id, "GET", null)
-            val aliases = record.optJSONArray("aliases").toStringList()
-            val refs = record.optJSONArray("references").toReferenceUrls()
-            OsvAdvisory(
-                id = record.optString("id", id),
-                summary = record.optString("summary").ifBlank { "No summary supplied by OSV." },
-                modified = record.optString("modified").takeIf { it.isNotBlank() },
-                aliases = aliases,
-                references = refs
-            )
+        val advisories = ids.take(MAX_ADVISORIES).mapNotNull { id ->
+            parseAdvisory(request(VULN_URL + id, "GET", null), id)
         }.distinctBy { it.id }.sortedBy { it.id }
 
         return OsvCheckResult(Instant.now().toString(), selected.size, advisories, truncated)
+    }
+
+
+    internal fun parseAdvisory(record: JSONObject, fallbackId: String): OsvAdvisory? {
+        if (record.has("withdrawn") && !record.isNull("withdrawn")) return null
+        val affected = record.optJSONArray("affected")
+        val affectedSummary = if (affected == null) emptyList() else
+            (0 until affected.length()).mapNotNull { index ->
+                val item = affected.optJSONObject(index) ?: return@mapNotNull null
+                val pkg = item.optJSONObject("package")
+                val name = pkg?.optString("name").orEmpty()
+                val ecosystem = pkg?.optString("ecosystem").orEmpty()
+                val versionList = item.optJSONArray("versions")
+                val versions = if (versionList == null) emptyList() else
+                    (0 until versionList.length()).map { versionList.optString(it) }.filter(String::isNotBlank).take(12)
+                val rangeList = item.optJSONArray("ranges")
+                val rangeTypes = if (rangeList == null) emptyList() else
+                    (0 until rangeList.length()).mapNotNull { rangeList.optJSONObject(it)?.optString("type") }.distinct()
+                val identity = listOf(name, ecosystem).filter(String::isNotBlank).joinToString(" • ")
+                if (identity.isBlank()) null else identity + buildString {
+                    if (versions.isNotEmpty()) append(" • listed versions: " + versions.joinToString())
+                    if (rangeTypes.isNotEmpty()) append(" • ranges: " + rangeTypes.joinToString())
+                }
+            }.take(20)
+        val severityValues = mutableListOf<String>()
+        val severityArray = record.optJSONArray("severity")
+        if (severityArray != null) for (i in 0 until severityArray.length()) {
+            severityArray.optJSONObject(i)?.optString("score")?.takeIf(String::isNotBlank)?.let(severityValues::add)
+        }
+        val aliases = record.optJSONArray("aliases").toStringList()
+        val references = record.optJSONArray("references").toReferenceUrls()
+        return OsvAdvisory(
+            id = record.optString("id", fallbackId),
+            summary = record.optString("summary").ifBlank { "No summary supplied by OSV." },
+            modified = record.optString("modified").takeIf { it.isNotBlank() },
+            aliases = aliases,
+            references = references,
+            affected = affectedSummary,
+            severity = severityValues.firstOrNull()
+        )
     }
 
     private fun request(endpoint: String, method: String, body: String?): JSONObject {
