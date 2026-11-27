@@ -93,7 +93,7 @@ object OsvClient {
                             (0 until events.length()).mapNotNull { eventIndex ->
                                 val event = events.optJSONObject(eventIndex) ?: return@mapNotNull null
                                 listOf("introduced", "fixed", "last_affected", "limit")
-                                    .firstNotNullOfOrNull { key -> event.optString(key).takeIf(String::isNotBlank)?.let { "$"+"{key} $"+ "{"+"it}" } }
+                                    .firstNotNullOfOrNull { key -> event.optString(key).takeIf(String::isNotBlank)?.let { key + " " + it } }
                             }
                         type + if (eventText.isEmpty()) "" else " (" + eventText.joinToString(", ") + ")"
                     }.take(12)
