@@ -26,7 +26,7 @@ object TerminalCommandEngine {
         val parts = raw.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (parts.isEmpty()) return Parsed.Invalid("Enter a command.")
         val name = parts.first().lowercase()
-        if (name in setOf("help", "status", "device", "refresh", "version", "clear", "exit")) {
+        if (name in setOf("help", "status", "device", "scan", "findings", "refresh", "version", "clear", "exit")) {
             return if (parts.size == 1) Parsed.BuiltIn(name)
             else Parsed.Invalid("The '$name' command does not accept arguments.")
         }
