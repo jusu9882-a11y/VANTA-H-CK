@@ -203,7 +203,8 @@ object MavenOsvDatabase {
                                 unsupported += "$id ($type)"
                                 continue
                             }
-                            val events = range.optJSONArray("events") ?: run {
+                            val events = range.optJSONArray("events")
+                            if (events == null || events.length() == 0) {
                                 unsupported += "$id (missing events)"
                                 continue
                             }
@@ -225,7 +226,7 @@ object MavenOsvDatabase {
         return MavenDatabaseCheck(status, advisories, unique.size, unsupported.size)
     }
 
-    private fun rangeAffects(events: org.json.JSONArray, version: String): Boolean? {
+    internal fun rangeAffects(events: org.json.JSONArray, version: String): Boolean? {
         val candidate = runCatching { ComparableVersion(version) }.getOrNull() ?: return null
         var lower: ComparableVersion? = null
         var active = false
@@ -264,7 +265,7 @@ object MavenOsvDatabase {
         return matched
     }
 
-    private fun validateArchive(file: File): Int {
+    internal fun validateArchive(file: File): Int {
         require(file.length() in 1..MAX_ARCHIVE_BYTES) { "OSV Maven archive size is invalid." }
         var count = 0
         var expanded = 0L
