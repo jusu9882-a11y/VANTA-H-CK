@@ -2,7 +2,11 @@ package dev.jusu.vantageshield
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull\nimport java.util.Random\nimport java.io.ByteArrayOutputStream\nimport java.nio.ByteBuffer\nimport java.nio.ByteOrder
+import org.junit.Assert.assertNull
+import java.util.Random
+import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
