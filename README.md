@@ -7,6 +7,7 @@ Standalone Android security assessment tool for the Vantage application.
 - Inspect APK ZIP contents and DEX strings for high-signal indicators such as HTTP URLs and embedded private-key or credential-like markers.
 - Structurally validate DEX headers, string/type/class tables, and inventory recognizable library namespaces from actual class definitions (for example OkHttp, Retrofit, Gson, Kotlin, AndroidX, and Bouncy Castle). Invalid DEX-like entries are reported as unavailable rather than silently trusted.
 - Decode the compiled Android binary manifest using an in-app parser and audit application flags, SDK target, declared permissions, and exported activities, services, receivers, providers, and aliases.
+- Recover exact Maven group/artifact/version coordinates when an APK embeds matching `META-INF/maven/**/pom.properties` files; validate the metadata path against the declared coordinates, bound metadata size, and deduplicate coordinates. Emit Maven Package URLs as SBOM inputs.
 - Perform cautious string-level cryptography/TLS triage for weak-algorithm and certificate-validation markers; identify bundled native libraries and dependency metadata as inventory leads.
 - Show severity, evidence, and remediation guidance for findings.
 - Run local Android device posture checks for API level, developer-options state (where readable), and Bluetooth/Wi-Fi adapter state.
