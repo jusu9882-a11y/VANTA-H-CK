@@ -30,7 +30,7 @@ data class MavenDatabaseCheck(
     val scannedPackages: Int,
     val unsupportedRangeRecords: Int
 ) {
-    val coverageComplete: Boolean get() = unsupportedRangeRecords == 0
+    val coverageComplete: Boolean get() = !status.stale && unsupportedRangeRecords == 0
 }
 
 /**
@@ -180,7 +180,7 @@ object MavenOsvDatabase {
                 val entry = entries.nextElement()
                 if (entry.isDirectory) continue
                 val name = entry.name
-                if (!name.endsWith(".json") || name.contains("/") || name.contains("\\\\") || name.startsWith(".")) {
+                if (!name.endsWith(".json") || name.contains("/") || name.contains("\\") || name.startsWith(".")) {
                     error("OSV archive contains an unexpected entry path.")
                 }
                 val bytes = zip.getInputStream(entry).use { input ->
@@ -267,31 +267,37 @@ object MavenOsvDatabase {
             val fixed = event.optString("fixed").takeIf { it.isNotBlank() }
             val last = event.optString("last_affected").takeIf { it.isNotBlank() }
             val limit = event.optString("limit").takeIf { it.isNotBlank() }
-            val count = listOf(introduced, fixed, last, limit).count { it != null }
-            if (count != 1) return null
+            if (listOf(introduced, fixed, last, limit).count { it != null } != 1) return null
             when {
                 introduced != null -> {
+                    if (active) return null
                     lower = if (introduced == "0") null else parseMavenVersion(introduced) ?: return null
                     active = true
                 }
                 fixed != null -> {
+                    if (!active) return null
                     val upper = parseMavenVersion(fixed) ?: return null
-                    if (active && (lower == null || candidate >= lower) && candidate < upper) matched = true
+                    if (lower != null && upper < lower!!) return null
+                    if ((lower == null || candidate >= lower!!) && candidate < upper) matched = true
                     active = false
                 }
                 last != null -> {
+                    if (!active) return null
                     val upper = parseMavenVersion(last) ?: return null
-                    if (active && (lower == null || candidate >= lower) && candidate <= upper) matched = true
+                    if (lower != null && upper < lower!!) return null
+                    if ((lower == null || candidate >= lower!!) && candidate <= upper) matched = true
                     active = false
                 }
                 limit != null -> {
+                    if (!active) return null
                     val upper = parseMavenVersion(limit) ?: return null
-                    if (active && (lower == null || candidate >= lower) && candidate < upper) matched = true
+                    if (lower != null && upper < lower!!) return null
+                    if ((lower == null || candidate >= lower!!) && candidate < upper) matched = true
                     active = false
                 }
             }
         }
-        if (active && (lower == null || candidate >= lower)) matched = true
+        if (active && (lower == null || candidate >= lower!!)) matched = true
         return matched
     }
 
@@ -312,7 +318,7 @@ object MavenOsvDatabase {
                 count++
                 require(count <= MAX_ENTRIES) { "OSV archive contains too many entries." }
                 require(entry.name.endsWith(".json") && !entry.name.contains("/") &&
-                    !entry.name.contains("\\\\") && !entry.name.startsWith(".")) {
+                    !entry.name.contains("\\") && !entry.name.startsWith(".")) {
                     "OSV archive contains an unsafe entry path."
                 }
                 require(entry.size in 1..MAX_ENTRY_BYTES && entry.compressedSize >= 0L) {
