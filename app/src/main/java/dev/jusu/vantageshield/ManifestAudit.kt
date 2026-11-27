@@ -36,11 +36,11 @@ object BinaryManifestReader {
         val components = mutableListOf<ManifestComponent>()
         val stack = mutableListOf<MutableComponent>()
 
-        while (offset + 8 <= bytes.size) {
+        while (offset + 8 <= declaredSize) {
             val type = u16(b, offset)
             val header = u16(b, offset + 2)
             val size = b.getInt(offset + 4)
-            if (header < 8 || size < header || size <= 0 || offset.toLong() + size > bytes.size) return null
+            if (header < 8 || size < header || size <= 0 || offset.toLong() + size > declaredSize) return null
             when (type) {
                 STRING_POOL -> strings = stringPool(b, offset, header, size)
                 START_ELEMENT -> {
@@ -54,7 +54,7 @@ object BinaryManifestReader {
                     val base = offset + 16 + attrStart
                     for (i in 0 until attrCount) {
                         val at = base + i * attrSize
-                        if (at + 20 > offset + size) return null
+                        if (at.toLong() + 20 > offset.toLong() + size) return null
                         val name = strings.getOrNull(b.getInt(at + 4)) ?: continue
                         val raw = b.getInt(at + 8)
                         val valueType = b.get(at + 15).toInt() and 255
@@ -107,7 +107,7 @@ object BinaryManifestReader {
         if (count !in 0..100000 || start < header || start >= size) return emptyList()
         return (0 until count).map { i ->
             val pos = off + header + i * 4
-            if (pos + 4 > off + size) return emptyList()
+            if (pos.toLong() + 4 > off.toLong() + size) return emptyList()
             val str = off + start + b.getInt(pos)
             if (str < off || str >= off + size) return emptyList()
             if ((flags and 0x100) != 0) utf8(b, str, off + size) else utf16(b, str, off + size)
