@@ -75,7 +75,7 @@ object BinaryManifestReader {
                             cleartext = attrs["usesCleartextTraffic"]?.toBooleanStrictOrNull()
                         }
                         "activity", "activity-alias", "service", "receiver", "provider" ->
-                            stack += MutableComponent(tag, attrs["name"] ?: "(unnamed)", attrs["exported"]?.toBooleanStrictOrNull(), attrs["permission"])
+                            stack += MutableComponent(tag, attrs["name"] ?: "(unnamed)", attrs["exported"]?.toBooleanStrictOrNull(), attrs["permission"] ?: "")
                         "intent-filter" -> stack.lastOrNull()?.intentFilter = true
                     }
                 }
