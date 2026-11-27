@@ -256,6 +256,7 @@ object MavenOsvDatabase {
     }
 
     internal fun rangeAffects(events: org.json.JSONArray, version: String): Boolean? {
+        if (events.length() == 0) return null
         val candidate = parseMavenVersion(version) ?: return null
         var lower: ComparableVersion? = null
         var active = false
