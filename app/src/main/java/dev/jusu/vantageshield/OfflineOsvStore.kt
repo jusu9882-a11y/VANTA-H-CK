@@ -47,7 +47,7 @@ object OfflineOsvStore {
 
         if (!result.truncated) {
             result.packageMatches.forEach { (purl, ids) ->
-                require(purl.matches(Regex("pkg:maven/[A-Za-z0-9_.+!~*'()-]+/[A-Za-z0-9_.+!~*'()-]+@[A-Za-z0-9_.!~*'()-]+"))) {
+                require(purl.matches(Regex("pkg:maven/[A-Za-z0-9_.+!~*'()-]+/[A-Za-z0-9_.+!~*'()-]+@[A-Za-z0-9_.+!~*'()-]+"))) {
                     "Invalid Maven package URL in OSV cache input."
                 }
                 packages.put(purl, JSONObject()
