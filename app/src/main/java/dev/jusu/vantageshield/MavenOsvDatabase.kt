@@ -89,6 +89,9 @@ object MavenOsvDatabase {
                 output.flush()
                 output.fd.sync()
             }
+        } catch (e: Exception) {
+            temp.delete()
+            throw e
         } finally {
             connection.disconnect()
         }
@@ -108,14 +111,27 @@ object MavenOsvDatabase {
             val metaTemp = File(directory, "$META.part")
             metaTemp.writeText(metadata.toString(), Charsets.UTF_8)
             FileOutputStream(metaTemp, true).use { it.fd.sync() }
-            Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            val metadataTarget = File(directory, META)
+            val archiveBackup = File(directory, "$ARCHIVE.previous")
+            val metadataBackup = File(directory, "$META.previous")
+            archiveBackup.delete()
+            metadataBackup.delete()
             try {
-                Files.move(metaTemp.toPath(), File(directory, META).toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                if (target.exists() && !target.renameTo(archiveBackup)) error("Cannot preserve the previous Maven database snapshot.")
+                if (metadataTarget.exists() && !metadataTarget.renameTo(metadataBackup)) error("Cannot preserve the previous Maven database metadata.")
+                Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                Files.move(metaTemp.toPath(), metadataTarget.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                val verified = status(directory)
+                archiveBackup.delete()
+                metadataBackup.delete()
+                return verified
             } catch (e: Exception) {
                 target.delete()
+                metadataTarget.delete()
+                if (archiveBackup.exists()) archiveBackup.renameTo(target)
+                if (metadataBackup.exists()) metadataBackup.renameTo(metadataTarget)
                 throw e
             }
-            return status(directory)
         } catch (e: Exception) {
             temp.delete()
             throw e
