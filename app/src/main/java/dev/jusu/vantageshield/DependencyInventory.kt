@@ -41,12 +41,13 @@ object DependencyInventory {
     fun audit(metadata: Map<String, ByteArray>): List<Finding> {
         val coordinates = parse(metadata)
         if (coordinates.isEmpty()) return emptyList()
+        val preview = coordinates.take(20).joinToString { it.purl }
+        val remainder = if (coordinates.size > 20) " and more." else "."
         return listOf(Finding(
             "Exact Maven dependency coordinates recovered",
             Severity.INFO,
             "Recovered " + coordinates.size + " Maven coordinate(s) from embedded pom.properties: " +
-                coordinates.take(20).joinToString { it.purl } +
-                if (coordinates.size > 20) " and more." else "" +
+                preview + remainder +
                 " Metadata provenance is embedded APK content; this is not proof every listed artifact is reachable at runtime.",
             "Use the coordinates and versions as SBOM inputs. Check them against a current, trusted advisory database; this build does not claim CVE coverage."
         ))
