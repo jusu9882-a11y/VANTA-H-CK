@@ -5,7 +5,7 @@ Standalone Android security assessment tool for the Vantage application.
 ## Current capabilities
 - Import an APK through Android's Storage Access Framework; no broad storage permission.
 - Inspect APK ZIP contents and DEX strings for high-signal indicators such as HTTP URLs and embedded private-key or credential-like markers.
-- Decode the compiled Android binary manifest using an in-app parser and audit application flags, SDK target, declared permissions, and exported activities, services, receivers, providers, and aliases.
+- Decode the compiled Android binary manifest using an in-app parser and audit application flags, SDK target, declared permissions, and exported activities, services, receivers, providers, and aliases.\n- Perform cautious string-level cryptography/TLS triage for weak-algorithm and certificate-validation markers; identify bundled native libraries and dependency metadata as inventory leads.
 - Show severity, evidence, and remediation guidance for findings.
 - Run local Android device posture checks for API level, developer-options state (where readable), and Bluetooth/Wi-Fi adapter state.
 - Open the built-in **SHIELD TERMINAL** for interactive local diagnostics: `help`, `status`, `device`, `refresh`, `version`, `clear`, and `exit`.
