@@ -227,7 +227,7 @@ object MavenOsvDatabase {
     }
 
     internal fun rangeAffects(events: org.json.JSONArray, version: String): Boolean? {
-        val candidate = runCatching { ComparableVersion(version) }.getOrNull() ?: return null
+        val candidate = parseMavenVersion(version) ?: return null
         var lower: ComparableVersion? = null
         var active = false
         var matched = false
@@ -241,21 +241,21 @@ object MavenOsvDatabase {
             if (count != 1) return null
             when {
                 introduced != null -> {
-                    lower = if (introduced == "0") null else runCatching { ComparableVersion(introduced) }.getOrNull() ?: return null
+                    lower = if (introduced == "0") null else parseMavenVersion(introduced) ?: return null
                     active = true
                 }
                 fixed != null -> {
-                    val upper = runCatching { ComparableVersion(fixed) }.getOrNull() ?: return null
+                    val upper = parseMavenVersion(fixed) ?: return null
                     if (active && (lower == null || candidate >= lower) && candidate < upper) matched = true
                     active = false
                 }
                 last != null -> {
-                    val upper = runCatching { ComparableVersion(last) }.getOrNull() ?: return null
+                    val upper = parseMavenVersion(last) ?: return null
                     if (active && (lower == null || candidate >= lower) && candidate <= upper) matched = true
                     active = false
                 }
                 limit != null -> {
-                    val upper = runCatching { ComparableVersion(limit) }.getOrNull() ?: return null
+                    val upper = parseMavenVersion(limit) ?: return null
                     if (active && (lower == null || candidate >= lower) && candidate < upper) matched = true
                     active = false
                 }
@@ -263,6 +263,11 @@ object MavenOsvDatabase {
         }
         if (active && (lower == null || candidate >= lower)) matched = true
         return matched
+    }
+
+    private fun parseMavenVersion(value: String): ComparableVersion? {
+        if (value.length !in 1..128 || !value.matches(Regex("[A-Za-z0-9][A-Za-z0-9._+!-]*"))) return null
+        return runCatching { ComparableVersion(value) }.getOrNull()
     }
 
     internal fun validateArchive(file: File): Int {
