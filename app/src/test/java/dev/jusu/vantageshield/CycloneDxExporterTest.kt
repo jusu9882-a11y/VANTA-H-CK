@@ -31,7 +31,7 @@ class CycloneDxExporterTest {
         val first = CycloneDxExporter.render(listOf(b, a, a))
         val second = CycloneDxExporter.render(listOf(a, b))
         assertEquals(first, second)
-        assertEquals(1, first.split("\\\"name\\\": \\\"alpha\\\"").size - 1)
+        assertEquals(1, first.split("\"name\": \"alpha\"").size - 1)
     }
 
     @Test fun escapesJsonControlCharactersAndQuotes() {
