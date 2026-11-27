@@ -36,6 +36,32 @@ class MavenOsvDatabaseTest {
         ))
     }
 
+    @Test fun rejectsRangeEventsThatCloseBeforeTheyOpen() {
+        val events = JSONArray().put(org.json.JSONObject().put("fixed", "2.0.0"))
+        assertNull(MavenOsvDatabase.rangeAffects(events, "1.0.0"))
+    }
+
+    @Test fun staleDatabaseNeverReportsCompleteCoverage() {
+        val status = MavenDatabaseStatus(
+            downloadedAt = "2026-01-01T00:00:00Z",
+            sourceLastModified = null,
+            etag = null,
+            archiveBytes = 10,
+            recordCount = 1,
+            sha256 = "a".repeat(64),
+            stale = true
+        )
+        assertFalse(MavenDatabaseCheck(status, emptyList(), 1, 0).coverageComplete)
+    }
+
+    @Test fun usesMavenVersionOrderingForQualifiers() {
+        val events = JSONArray()
+            .put(org.json.JSONObject().put("introduced", "1.0.0-alpha"))
+            .put(org.json.JSONObject().put("fixed", "1.0.0"))
+        assertTrue(MavenOsvDatabase.rangeAffects(events, "1.0.0-beta") == true)
+        assertFalse(MavenOsvDatabase.rangeAffects(events, "1.0.0") == true)
+    }
+
     @Test fun validatesAWellFormedMavenArchiveAndCountsRecords() {
         val file = Files.createTempFile("osv-maven", ".zip").toFile()
         try {
