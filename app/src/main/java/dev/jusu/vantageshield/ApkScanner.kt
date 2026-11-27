@@ -17,6 +17,7 @@ object ApkScanner {
         val inspected = StringBuilder()
         val manifestOutput = ByteArrayOutputStream()
         val dexFiles = mutableListOf<Pair<String, ByteArray>>()
+        val dependencyMetadata = linkedMapOf<String, ByteArray>()
         var total = 0L
         var entries = 0
         ZipInputStream(BufferedInputStream(input)).use { zip ->
@@ -30,6 +31,8 @@ object ApkScanner {
                 val capture = isManifest || isDex || entry.name.endsWith(".so") ||
                     (entry.name.startsWith("META-INF/") && (entry.name.endsWith(".version", true) ||
                         entry.name.endsWith("pom.properties", true) || entry.name.endsWith("pom.xml", true)))
+                val isPomProperties = entry.name.startsWith("META-INF/maven/") && entry.name.endsWith("/pom.properties", true)
+                val metadataOutput = if (isPomProperties) ByteArrayOutputStream() else null
                 val dexOutput = if (isDex) ByteArrayOutputStream() else null
                 var entryBytes = 0L
                 val buffer = ByteArray(8192)
@@ -43,9 +46,11 @@ object ApkScanner {
                     }
                     if (capture) inspected.append(String(buffer, 0, n, Charsets.ISO_8859_1))
                     if (isManifest) manifestOutput.write(buffer, 0, n)
+                    metadataOutput?.write(buffer, 0, n)
                     dexOutput?.write(buffer, 0, n)
                 }
                 if (dexOutput != null) dexFiles += entry.name to dexOutput.toByteArray()
+                if (metadataOutput != null) dependencyMetadata[entry.name] = metadataOutput.toByteArray()
                 zip.closeEntry()
             }
         }
@@ -53,6 +58,7 @@ object ApkScanner {
         val manifestFacts = if (manifestOutput.size() > 0) BinaryManifestReader.read(manifestOutput.toByteArray()) else null
         if (manifestFacts != null) findings += ManifestAuditor.audit(manifestFacts)
         findings += DexInventory.audit(dexFiles)
+        findings += DependencyInventory.audit(dependencyMetadata)
 
         val inspectedText = inspected.toString()
         findings += CryptoDependencyAuditor.audit(inspectedText, names)
