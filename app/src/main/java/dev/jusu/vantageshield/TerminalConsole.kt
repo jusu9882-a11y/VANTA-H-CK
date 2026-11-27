@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun TerminalConsole(
     checks: List<DeviceCheck>,
+    report: ScanReport?,
     onRefresh: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -63,6 +64,8 @@ fun TerminalConsole(
                     "help       List commands",
                     "status     Summarize current device posture checks",
                     "device     Show individual device posture checks",
+                    "scan       Show the most recent APK scan summary",
+                    "findings   List findings from the most recent APK scan",
                     "refresh    Re-read available device posture signals",
                     "version    Show app and console version",
                     "clear      Clear terminal output",
@@ -95,6 +98,16 @@ fun TerminalConsole(
                 ))
                 "device" -> append(input, if (checks.isEmpty()) listOf("No device checks available.")
                     else checks.map { "${it.status.padEnd(7)} ${it.name}: ${it.detail}" })
+                "scan" -> append(input, report?.let { listOf(
+                    "Latest APK: ${it.fileName}",
+                    "Archive entries inspected: ${it.inspectedEntries}",
+                    "Findings: ${it.findings.size}",
+                    "Risk findings (critical/high/medium): ${it.riskCount}",
+                    "A clean result is not proof that the APK is secure."
+                ) } ?: listOf("No APK scan report is loaded. Return to the dashboard and select an APK first."))
+                "findings" -> append(input, report?.findings?.mapIndexed { index, finding ->
+                    "${index + 1}. [${finding.severity}] ${finding.title} — ${finding.evidence}"
+                } ?: listOf("No APK scan report is loaded. Return to the dashboard and select an APK first."))
                 "refresh" -> {
                     onRefresh()
                     append(input, listOf("Device posture refresh requested. Run 'device' again after the dashboard updates."))
