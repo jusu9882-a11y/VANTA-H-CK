@@ -12,6 +12,11 @@ class TerminalCommandEngineTest {
         )
     }
 
+    @Test fun registersAppSpecificSecurityCommands() {
+        assertEquals(TerminalCommandEngine.Parsed.BuiltIn("scan"), TerminalCommandEngine.parse("scan"))
+        assertEquals(TerminalCommandEngine.Parsed.BuiltIn("findings"), TerminalCommandEngine.parse("findings"))
+    }
+
     @Test fun mapsSystemCommandsToFixedExecutables() {
         val parsed = TerminalCommandEngine.parse("id")
         assertTrue(parsed is TerminalCommandEngine.Parsed.System)
