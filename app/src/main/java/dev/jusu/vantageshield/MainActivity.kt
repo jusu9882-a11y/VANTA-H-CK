@@ -194,15 +194,15 @@ class MainActivity : ComponentActivity() {
                                     offlineError?.let { Text("OFFLINE STATUS UNKNOWN • " + it, color = MaterialTheme.colorScheme.error) }
                                     offlineResult?.let { cached ->
                                         Text(
-                                            if (!cached.complete) "OFFLINE COVERAGE INCOMPLETE • \${cached.packagesChecked}/\${r.dependencies.distinctBy { it.purl }.size} exact package versions covered."
-                                            else "OFFLINE CACHE • \${cached.packagesChecked} exact package version(s) • checked \${cached.checkedAt}.",
+                                            if (!cached.complete) "OFFLINE COVERAGE INCOMPLETE • ${cached.packagesChecked}/${r.dependencies.distinctBy { it.purl }.size} exact package versions covered."
+                                            else "OFFLINE CACHE • ${cached.packagesChecked} exact package version(s) • checked ${cached.checkedAt}.",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = if (!cached.complete || cached.stale) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                                         )
                                         if (cached.stale) Text("STALE CACHE • Older than 30 days or coverage is incomplete. Refresh online before relying on results.", style = MaterialTheme.typography.bodySmall)
                                         if (cached.complete && cached.advisories.isEmpty()) Text("No matching advisory records in this cached coverage. This is not proof of safety.", style = MaterialTheme.typography.bodySmall)
                                         cached.advisories.forEach { advisory ->
-                                            Text("CACHED • \${advisory.id}: \${advisory.summary}", style = MaterialTheme.typography.bodySmall)
+                                            Text("CACHED • ${advisory.id}: ${advisory.summary}", style = MaterialTheme.typography.bodySmall)
                                             if (advisory.matchedComponents.isNotEmpty()) Text("Matched: " + advisory.matchedComponents.joinToString(), style = MaterialTheme.typography.bodySmall)
                                             advisory.references.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
                                         }
