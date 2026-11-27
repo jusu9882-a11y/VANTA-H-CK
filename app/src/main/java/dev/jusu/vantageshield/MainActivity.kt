@@ -27,6 +27,9 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun ShieldApp() {
         var report by remember { mutableStateOf<ScanReport?>(null) }
+        var osvResult by remember { mutableStateOf<OsvCheckResult?>(null) }
+        var osvError by remember { mutableStateOf<String?>(null) }
+        var osvBusy by remember { mutableStateOf(false) }
         var checks by remember { mutableStateOf(DeviceChecks.run(this)) }
         var busy by remember { mutableStateOf(false) }
         var showTerminal by remember { mutableStateOf(false) }
@@ -61,6 +64,8 @@ class MainActivity : ComponentActivity() {
                             } ?: error("Unable to open selected file.")
                         }
                         report = result
+                        osvResult = null
+                        osvError = null
                         message = "Scan completed. Validate findings before treating them as vulnerabilities."
                     } catch (e: Exception) {
                         message = "Scan failed: ${e.message ?: "unknown error"}"
@@ -111,6 +116,17 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         report?.let { r ->
+                            osvResult?.advisories?.forEach { advisory ->
+                                item(key = "osv-" + advisory.id) {
+                                    Card { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                        Text("OSV • " + advisory.id, style = MaterialTheme.typography.titleMedium)
+                                        Text(advisory.summary)
+                                        if (advisory.aliases.isNotEmpty()) Text("Aliases: " + advisory.aliases.joinToString())
+                                        advisory.modified?.let { Text("Last modified: " + it, style = MaterialTheme.typography.bodySmall) }
+                                        advisory.references.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                                    } }
+                                }
+                            }
                             item {
                                 Card { Column(Modifier.padding(15.dp)) {
                                     Text("ASSESSMENT RESULTS", style = MaterialTheme.typography.titleLarge)
@@ -122,6 +138,30 @@ class MainActivity : ComponentActivity() {
                                         enabled = !busy,
                                         modifier = Modifier.fillMaxWidth()
                                     ) { Text("EXPORT CYCLONEDX SBOM") }
+                                    OutlinedButton(
+                                        onClick = {
+                                            osvBusy = true
+                                            osvError = null
+                                            osvResult = null
+                                            scope.launch {
+                                                try {
+                                                    osvResult = withContext(Dispatchers.IO) { OsvClient.check(r.dependencies) }
+                                                } catch (e: Exception) {
+                                                    osvError = e.message ?: "OSV lookup failed."
+                                                } finally { osvBusy = false }
+                                            }
+                                        },
+                                        enabled = !busy && !osvBusy && r.dependencies.isNotEmpty(),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text(if (osvBusy) "CHECKING OSV…" else "CHECK OSV ADVISORIES (INTERNET)") }
+                                    Text("This sends exact package names and versions to api.osv.dev. No APK, file contents, or personal data are uploaded.", style = MaterialTheme.typography.bodySmall)
+                                    if (osvBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                                    osvError?.let { Text("OSV STATUS UNKNOWN • " + it, color = MaterialTheme.colorScheme.error) }
+                                    osvResult?.let { result ->
+                                        val summary = if (result.advisories.isEmpty()) "No matching advisories were returned; this is not proof of safety." else result.advisories.size.toString() + " advisory record(s) returned."
+                                        Text("OSV checked " + result.packagesChecked + " package(s) at " + result.checkedAt + ". " + summary, style = MaterialTheme.typography.bodySmall)
+                                        if (result.truncated) Text("Result capped for safety; not all packages or advisories may be represented.")
+                                    }
                                 } }
                             }
                             items(r.findings) { f ->
