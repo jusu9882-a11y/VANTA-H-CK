@@ -206,11 +206,20 @@ object MavenOsvDatabase {
                     val versions = item.optJSONArray("versions")
                     var hit = false
                     if (versions != null) {
+                        val candidateVersion = parseMavenVersion(version)
                         for (v in 0 until versions.length()) {
-                            if (versions.optString(v) == version) hit = true
+                            val listedVersion = parseMavenVersion(versions.optString(v))
+                            if (candidateVersion != null && listedVersion != null && candidateVersion.compareTo(listedVersion) == 0) {
+                                hit = true
+                            } else if (listedVersion == null) {
+                                unsupported += "$id (invalid explicit Maven version)"
+                            }
                         }
                     }
                     val ranges = item.optJSONArray("ranges")
+                    if ((versions == null || versions.length() == 0) && (ranges == null || ranges.length() == 0)) {
+                        unsupported += "$id (no affected version data)"
+                    }
                     if (!hit && ranges != null) {
                         for (rangeIndex in 0 until ranges.length()) {
                             val range = ranges.optJSONObject(rangeIndex) ?: continue
