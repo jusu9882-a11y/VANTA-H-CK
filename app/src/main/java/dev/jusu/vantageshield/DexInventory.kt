@@ -23,7 +23,10 @@ object DexInventory {
     fun inspect(bytes: ByteArray): List<DexLibraryHit>? {
         if (bytes.size < HEADER_SIZE || !bytes.copyOfRange(0, 4).contentEquals(byteArrayOf(0x64, 0x65, 0x78, 0x0a))) return null
         val b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-        if (b.getInt(40) != 0x12345678) return null
+        if (bytes[7].toInt() != 0 || bytes[4].toInt().toChar() !in '0'..'9' ||
+            bytes[5].toInt().toChar() !in '0'..'9' || bytes[6].toInt().toChar() !in '0'..'9') return null
+        if (b.getInt(32) != bytes.size || b.getInt(36) != HEADER_SIZE ||
+            b.getInt(40) != 0x12345678) return null
         val stringCount = b.getInt(56); val stringOffset = b.getInt(60)
         val typeCount = b.getInt(64); val typeOffset = b.getInt(68)
         val classCount = b.getInt(96); val classOffset = b.getInt(100)
@@ -36,6 +39,7 @@ object DexInventory {
             val dataOffset = b.getInt(stringOffset + i * 4)
             if (dataOffset !in HEADER_SIZE until bytes.size) return null
             val length = readUleb(b, dataOffset) ?: return null
+            if (length.first < 0 || length.first > bytes.size) return null
             var p = length.second
             val start = p
             while (p < bytes.size && bytes[p].toInt() != 0) p++
