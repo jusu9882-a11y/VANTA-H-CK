@@ -21,6 +21,9 @@ object BinaryManifestReader {
         if ( bytes.size < 8) return null
         val b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
         if (u16(b, 0) != 0x0003) return null
+        val declaredSize = b.getInt(4)
+        if (declaredSize < u16(b, 2) || declaredSize > bytes.size) return null
+        var sawManifest = false
         var offset = u16(b, 2).coerceAtLeast(8)
         var strings = emptyList<String>()
         var pkg: String? = null
@@ -66,7 +69,7 @@ object BinaryManifestReader {
                         if (value != null) attrs[name] = value
                     }
                     when (tag) {
-                        "manifest" -> pkg = attrs["package"]
+                        "manifest" -> { sawManifest = true; pkg = attrs["package"] }
                         "uses-sdk" -> { min = attrs["minSdkVersion"]?.toIntOrNull(); target = attrs["targetSdkVersion"]?.toIntOrNull() }
                         "uses-permission", "uses-permission-sdk-23", "uses-permission-sdk-m" -> attrs["name"]?.let { permissions += it }
                         "application" -> {
@@ -88,6 +91,7 @@ object BinaryManifestReader {
             }
             offset += size
         }
+        if (!sawManifest) return null
         return ManifestFacts(pkg, min, target, debug, backup, cleartext, permissions.toList(), components)
     }
 
