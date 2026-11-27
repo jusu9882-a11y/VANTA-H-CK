@@ -31,7 +31,7 @@ class OsvClientTest {
         assertEquals(listOf("CVE-2026-12345"), parsed.aliases)
         assertEquals(1, parsed.references.size)
         assertTrue(parsed.affected.single().contains("okhttp"))
-        assertTrue(parsed.affected.single().contains("4.2.0").not())
+        assertTrue(parsed.affected.single().contains("fixed 4.2.0"))
         assertTrue(parsed.affected.single().contains("ECOSYSTEM"))
     }
 
