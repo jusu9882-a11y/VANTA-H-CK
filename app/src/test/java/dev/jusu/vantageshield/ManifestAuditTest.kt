@@ -2,7 +2,7 @@ package dev.jusu.vantageshield
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertNull\nimport java.util.Random
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
