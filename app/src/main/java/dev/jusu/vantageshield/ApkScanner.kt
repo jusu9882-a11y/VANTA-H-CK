@@ -16,6 +16,7 @@ object ApkScanner {
         val names = mutableSetOf<String>()
         val inspected = StringBuilder()
         val manifestOutput = ByteArrayOutputStream()
+        val dexFiles = mutableListOf<Pair<String, ByteArray>>()
         var total = 0L
         var entries = 0
         ZipInputStream(BufferedInputStream(input)).use { zip ->
@@ -25,9 +26,11 @@ object ApkScanner {
                 names += entry.name
                 if (entry.isDirectory) continue
                 val isManifest = entry.name == "AndroidManifest.xml"
-                val capture = isManifest || entry.name.endsWith(".dex") || entry.name.endsWith(".so") ||
+                val isDex = Regex("classes(\\d*)\\.dex").matches(entry.name)
+                val capture = isManifest || isDex || entry.name.endsWith(".so") ||
                     (entry.name.startsWith("META-INF/") && (entry.name.endsWith(".version", true) ||
                         entry.name.endsWith("pom.properties", true) || entry.name.endsWith("pom.xml", true)))
+                val dexOutput = if (isDex) ByteArrayOutputStream() else null
                 var entryBytes = 0L
                 val buffer = ByteArray(8192)
                 while (true) {
@@ -40,13 +43,16 @@ object ApkScanner {
                     }
                     if (capture) inspected.append(String(buffer, 0, n, Charsets.ISO_8859_1))
                     if (isManifest) manifestOutput.write(buffer, 0, n)
+                    dexOutput?.write(buffer, 0, n)
                 }
+                if (dexOutput != null) dexFiles += entry.name to dexOutput.toByteArray()
                 zip.closeEntry()
             }
         }
 
         val manifestFacts = if (manifestOutput.size() > 0) BinaryManifestReader.read(manifestOutput.toByteArray()) else null
         if (manifestFacts != null) findings += ManifestAuditor.audit(manifestFacts)
+        findings += DexInventory.audit(dexFiles)
 
         val inspectedText = inspected.toString()
         findings += CryptoDependencyAuditor.audit(inspectedText, names)
@@ -72,7 +78,7 @@ object ApkScanner {
             "A string resembles a credential assignment; heuristic false positives are possible.",
             "Review locally, revoke exposed credentials, and never ship reusable secrets in an APK."
         )
-        if (names.none { it.startsWith("classes") && it.endsWith(".dex") }) findings += Finding(
+        if (names.none { Regex("classes(\\d*)\\.dex").matches(it) }) findings += Finding(
             "No DEX bytecode found", Severity.LOW, "No classes*.dex archive entry was found.",
             "Confirm that the selected file is a valid Android APK."
         )
