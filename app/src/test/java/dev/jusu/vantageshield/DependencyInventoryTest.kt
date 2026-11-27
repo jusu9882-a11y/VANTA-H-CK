@@ -28,7 +28,7 @@ class DependencyInventoryTest {
         assertTrue(DependencyInventory.parse(mapOf(path to huge, "META-INF/maven/com/example/other/pom.properties" to malformed)).isEmpty())
     }
 
-    @Test fun duplicateCoordinatesAreDeduplicated() {
+    @Test fun ignoresNonPomMetadataFiles() {
         val content = "groupId=com.example\nartifactId=library\nversion=1.2.3\n".toByteArray()
         val one = "META-INF/maven/com.example/library/pom.properties"
         assertEquals(1, DependencyInventory.parse(mapOf(one to content, one + ".copy" to content)).size)
