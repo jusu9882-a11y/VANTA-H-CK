@@ -84,12 +84,23 @@ object OsvClient {
                 val versions = if (versionList == null) emptyList() else
                     (0 until versionList.length()).map { versionList.optString(it) }.filter(String::isNotBlank).take(12)
                 val rangeList = item.optJSONArray("ranges")
-                val rangeTypes = if (rangeList == null) emptyList() else
-                    (0 until rangeList.length()).mapNotNull { rangeList.optJSONObject(it)?.optString("type") }.distinct()
+                val rangeEvidence = if (rangeList == null) emptyList() else
+                    (0 until rangeList.length()).mapNotNull { rangeIndex ->
+                        val range = rangeList.optJSONObject(rangeIndex) ?: return@mapNotNull null
+                        val type = range.optString("type")
+                        val events = range.optJSONArray("events")
+                        val eventText = if (events == null) emptyList() else
+                            (0 until events.length()).mapNotNull { eventIndex ->
+                                val event = events.optJSONObject(eventIndex) ?: return@mapNotNull null
+                                listOf("introduced", "fixed", "last_affected", "limit")
+                                    .firstNotNullOfOrNull { key -> event.optString(key).takeIf(String::isNotBlank)?.let { "$"+"{key} $"+ "{"+"it}" } }
+                            }
+                        type + if (eventText.isEmpty()) "" else " (" + eventText.joinToString(", ") + ")"
+                    }.take(12)
                 val identity = listOf(name, ecosystem).filter(String::isNotBlank).joinToString(" • ")
                 if (identity.isBlank()) null else identity + buildString {
                     if (versions.isNotEmpty()) append(" • listed versions: " + versions.joinToString())
-                    if (rangeTypes.isNotEmpty()) append(" • ranges: " + rangeTypes.joinToString())
+                    if (rangeEvidence.isNotEmpty()) append(" • ranges: " + rangeEvidence.joinToString())
                 }
             }.take(20)
         val severityValues = mutableListOf<String>()
