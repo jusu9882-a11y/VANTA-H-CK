@@ -11,7 +11,8 @@ object CryptoDependencyAuditor {
         "DESede" to "3DES",
         "RC4" to "RC4",
         "MD5" to "MD5",
-        "SHA1" to "SHA-1",\n        "SHA-1" to "SHA-1"
+        "SHA1" to "SHA-1",
+        "SHA-1" to "SHA-1"
     )
     private val trustMarkers = listOf(
         "TrustAllCerts", "ALLOW_ALL_HOSTNAME_VERIFIER", "HostnameVerifier",
@@ -21,7 +22,11 @@ object CryptoDependencyAuditor {
 
     fun audit(strings: String, entries: Set<String>): List<Finding> = buildList {
         val normalized = strings.uppercase()
-        val weak = weakAlgorithms.filter { marker ->\n            val token = marker.first.uppercase()\n            if (token == "AES/ECB") normalized.contains(token)\n            else Regex("(?<![A-Z0-9])" + Regex.escape(token) + "(?![A-Z0-9])").containsMatchIn(normalized)\n        }
+        val weak = weakAlgorithms.filter { marker ->
+            val token = marker.first.uppercase()
+            if (token == "AES/ECB") normalized.contains(token)
+            else Regex("(?<![A-Z0-9])" + Regex.escape(token) + "(?![A-Z0-9])").containsMatchIn(normalized)
+        }
         if (weak.isNotEmpty()) add(Finding(
             "Weak cryptography indicators", Severity.MEDIUM,
             "Inspected DEX/native strings contain marker(s): " + weak.joinToString { it.second } +
