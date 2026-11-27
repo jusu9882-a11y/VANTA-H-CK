@@ -22,7 +22,9 @@ data class OsvCheckResult(
     val checkedAt: String,
     val packagesChecked: Int,
     val advisories: List<OsvAdvisory>,
-    val truncated: Boolean
+    val truncated: Boolean,
+    val packageMatches: Map<String, List<String>> = emptyMap(),
+    val rawAdvisories: Map<String, String> = emptyMap()
 )
 
 /**
@@ -66,11 +68,21 @@ object OsvClient {
         }
 
         val truncated = unique.size > MAX_PACKAGES || matches.size > MAX_ADVISORIES
+        val rawRecords = linkedMapOf<String, String>()
         val advisories = matches.keys.take(MAX_ADVISORIES).mapNotNull { id ->
-            parseAdvisory(request(VULN_URL + id, "GET", null), id, matches[id].orEmpty().toList())
+            val record = request(VULN_URL + id, "GET", null)
+            if (record.optString("id") != id) error("OSV advisory identity did not match the requested ID.")
+            rawRecords[id] = record.toString()
+            parseAdvisory(record, id, matches[id].orEmpty().toList())
         }.distinctBy { it.id }.sortedBy { it.id }
 
-        return OsvCheckResult(Instant.now().toString(), selected.size, advisories, truncated)
+        val packageMatches = selected.associate { dependency ->
+            dependency.purl to matches.filterValues { dependency.purl in it }.keys.toList()
+        }
+        return OsvCheckResult(
+            Instant.now().toString(), selected.size, advisories, truncated,
+            packageMatches, rawRecords
+        )
     }
 
 
