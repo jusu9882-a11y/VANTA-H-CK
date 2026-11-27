@@ -46,11 +46,11 @@ object ApkScanner {
                     }
                     if (capture) inspected.append(String(buffer, 0, n, Charsets.ISO_8859_1))
                     if (isManifest) manifestOutput.write(buffer, 0, n)
-                    metadataOutput?.write(buffer, 0, n)
+                    if (metadataOutput != null && entryBytes <= 64 * 1024) metadataOutput.write(buffer, 0, n)
                     dexOutput?.write(buffer, 0, n)
                 }
                 if (dexOutput != null) dexFiles += entry.name to dexOutput.toByteArray()
-                if (metadataOutput != null) dependencyMetadata[entry.name] = metadataOutput.toByteArray()
+                if (metadataOutput != null && entryBytes <= 64 * 1024) dependencyMetadata[entry.name] = metadataOutput.toByteArray()
                 zip.closeEntry()
             }
         }
