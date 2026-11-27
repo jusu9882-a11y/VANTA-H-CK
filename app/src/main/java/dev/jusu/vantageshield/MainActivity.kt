@@ -121,6 +121,7 @@ class MainActivity : ComponentActivity() {
                                     Card { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                         Text("OSV • " + advisory.id, style = MaterialTheme.typography.titleMedium)
                                         Text(advisory.summary)
+                                        if (advisory.matchedComponents.isNotEmpty()) Text("Matched scanned component: " + advisory.matchedComponents.joinToString(), style = MaterialTheme.typography.bodySmall)
                                         advisory.severity?.let { Text("CVSS: " + it, style = MaterialTheme.typography.bodySmall) }
                                         advisory.affected.forEach { Text("Affected: " + it, style = MaterialTheme.typography.bodySmall) }
                                         if (advisory.aliases.isNotEmpty()) Text("Aliases: " + advisory.aliases.joinToString())
