@@ -2,19 +2,44 @@
 
 Standalone Android security assessment tool for the Vantage application.
 
-## First release
+## Current capabilities
 - Import an APK through Android's Storage Access Framework; no broad storage permission.
-- Inspect APK ZIP contents and DEX/manifest byte strings for high-signal security indicators.
-- Show severity, evidence, and remediation guidance.
+- Inspect APK ZIP contents and DEX strings for high-signal indicators such as HTTP URLs and embedded private-key or credential-like markers.
+- Structurally validate DEX headers, string/type/class tables, and inventory recognizable library namespaces from actual class definitions (for example OkHttp, Retrofit, Gson, Kotlin, AndroidX, and Bouncy Castle). Invalid DEX-like entries are reported as unavailable rather than silently trusted.
+- Decode the compiled Android binary manifest using an in-app parser and audit application flags, SDK target, declared permissions, and exported activities, services, receivers, providers, and aliases.
+- Recover exact Maven group/artifact/version coordinates when an APK embeds matching `META-INF/maven/**/pom.properties` files; validate the metadata path against the declared coordinates, bound metadata size, and deduplicate coordinates. Emit Maven Package URLs as SBOM inputs.
+- Export a CycloneDX 1.6 JSON SBOM through Android’s document picker. The export includes only validated embedded Maven coordinates, records the evidence source and metadata path, sorts and deduplicates components, and excludes DEX namespace-only heuristics. An empty inventory produces an empty component list, not guessed dependencies.
+- Perform cautious string-level cryptography/TLS triage for weak-algorithm and certificate-validation markers; identify bundled native libraries and dependency metadata as inventory leads.
+- Show severity, evidence, and remediation guidance for findings.
 - Run local Android device posture checks for API level, developer-options state (where readable), and Bluetooth/Wi-Fi adapter state.
-- Open the built-in **SHIELD TERMINAL** for interactive local diagnostics: `help`, `status`, `device`, `refresh`, `version`, `clear`, and `exit`.
+- Open the built-in **SHIELD TERMINAL** for app-specific commands (`help`, `status`, `device`, `scan`, `findings`, `refresh`, `version`, `clear`, `exit`) and real read-only Android diagnostics (`id`, `whoami`, `uname`, `uptime`, `df`, `ps`, `ip addr`, `ip route`, and approved `getprop` values).
 - Offline operation; the APK is analyzed locally and never uploaded.
 
-## Terminal safety
-The terminal is a restricted diagnostic console, not an unrestricted Android/Linux shell. It accepts only documented built-in commands and does not execute arbitrary shell strings, require root, or provide network access.
+## SBOM scope and limitations
+The CycloneDX export is an evidence-backed partial inventory, not a complete dependency graph. It only includes exact coordinates recovered from matching embedded Maven `pom.properties`; many Android libraries omit this metadata, so absence from the SBOM does not mean absence from the APK. DEX namespace recognition is intentionally not treated as an exact package/version. The export does not itself match CVEs or advisories. An explicit **CHECK OSV ADVISORIES (INTERNET)** action sends only the recovered Maven package identifiers and versions to the official OSV API over HTTPS; the APK and its contents are not uploaded. The integration uses OSV querybatch followed by individual advisory-record retrieval, displays advisory IDs, exact matched scanned coordinates, aliases, summaries, modified timestamps, affected package/version/range evidence and HTTPS references, and omits withdrawn records. Requests and responses are bounded; lookup failures are reported as UNKNOWN, not as a clean result. A no-match response means only that OSV returned no matching records at lookup time, not that the package is safe or that all vulnerabilities are covered.
+
+## OSV advisory lookup limitations\nOSV is an aggregated open-source vulnerability database, not a guarantee of complete coverage. Matching is only as good as the exact embedded Maven coordinates and the database records available at query time. The lookup is online and user-initiated; package names and versions are sent to `api.osv.dev`. It does not upload the APK, inspect proprietary components, or infer dependency versions from DEX namespace markers. Advisory range evidence is displayed for analyst review; do not treat a record as exploitable without checking the affected package and version semantics.\n\n
+## Offline OSV advisory cache
+The **CHECK OFFLINE ADVISORY CACHE** action checks exact Maven package URLs and versions against an app-private cache created by a successful online OSV check. It does not need a network connection during the offline check. The cache stores the exact queried package-version coverage, returned OSV advisory records, the OSV check timestamp, and source provenance. Cache entries older than 30 days are marked stale. If a scanned exact version was not previously checked, the result is **OFFLINE COVERAGE INCOMPLETE / UNKNOWN** rather than clean. Truncated online responses are not recorded as complete coverage.
+
+The cache is intentionally a targeted cache, **not the complete Maven OSV ecosystem database**. It cannot discover advisories for package versions that have never been checked online. The stored SHA-256 digest detects accidental cache corruption; it is not a digital signature and does not prove publisher authenticity. Online records are obtained over HTTPS from OSV.dev. A cache no-match is not proof of safety. OSV documents downloadable per-ecosystem archives at [its data dump documentation](https://google.github.io/osv.dev/data/) and offline scanning at [OSV-Scanner offline mode](https://google.github.io/osv-scanner/usage/offline-mode/); importing the entire Maven archive is not enabled in this release because it needs separate storage, download-size, archive-validation, and update testing.
+
+## Full offline Maven OSV database
+
+The **DOWNLOAD / UPDATE FULL MAVEN OSV DATABASE** action downloads the Maven ecosystem archive published by OSV over HTTPS. The compressed archive remains in app-private storage; the app does not extract entries to filesystem paths. Before activation, the importer checks the ZIP structure, entry paths, entry count, per-entry and total expanded sizes, compression ratios, JSON records, and filename-to-advisory-ID identity. Download and expansion are bounded (64 MiB archive, 128 MiB expanded, 4 MiB per record, 100,000 records). Failed downloads or invalid archives are not treated as a usable database.
+
+The **CHECK FULL MAVEN DATABASE OFFLINE** action matches exact Maven coordinates recovered from the APK against local OSV records. Maven ecosystem ranges are compared using Apache Maven's version ordering, with fixed versions treated as exclusive and last-affected versions as inclusive. Withdrawn records are ignored. Unsupported, malformed, or structurally invalid matching range records are counted and make coverage incomplete; they are not silently treated as unaffected. Invalid event sequences (for example, a fixed event before an introduced event) return UNKNOWN. A stale snapshot also cannot report complete coverage. The database is refreshed only when the user explicitly requests an update. A snapshot older than 30 days is marked stale.
+
+The archive SHA-256 is checked locally to detect accidental corruption; it is not a publisher signature or independent authenticity proof. The OSV data itself is an aggregated advisory source and cannot guarantee that all vulnerabilities are known. Even a complete local archive match with no results is not proof that a package or APK is safe. See [OSV's official database dump documentation](https://google.github.io/osv.dev/data/) and [OSV-Scanner's offline database format](https://google.github.io/osv-scanner/usage/offline-mode/).
+
+## Manifest audit scope and limitations
+The binary XML reader extracts common manifest string and typed attributes. Current rules flag release debuggability, cleartext traffic explicitly enabled, backup enabled, older target SDK values, and exported components without a component-level permission. Exported status alone is not proof of a vulnerability. Findings are triage signals and require manual review. Resource references, manifest-merger provenance, network security configuration contents, SDK-specific component semantics, and all permission protection levels are not yet fully resolved. A manifest that cannot be decoded is not silently treated as clean.
+
+## Terminal commands and safety
+The terminal is a restricted Android diagnostic command interpreter, not an unrestricted shell. App-specific commands read the current device posture and most recent APK assessment. System commands execute fixed `/system/bin/toybox` or `/system/bin/getprop` argument arrays directly through Android ProcessBuilder; no shell is invoked. The allowlist rejects arbitrary executables, command chaining, scripts, and unapproved property names. Commands run with the app UID and Android sandbox permissions, without root. System commands have a short timeout and bounded output. Network inspection commands only display local interface and route information; they do not scan or attack networks. The terminal uses a green-on-black colour-2 theme.
 
 ## Safety boundaries
-This release performs passive local APK inspection and non-invasive device posture checks. It does not exploit devices, intercept third-party traffic, bypass Android protections, or attack nearby networks. Dynamic Bluetooth/Wi-Fi protocol testing requires an explicitly paired, consented Vantage test device and a dedicated isolated test mode. Heuristic APK findings require manual validation and a clean scan is not a security certification.
+This release performs passive local APK inspection and non-invasive device posture checks. It does not exploit devices, intercept third-party traffic, bypass Android protections, or attack nearby networks. Dynamic Bluetooth/Wi-Fi protocol testing requires an explicitly paired, consented Vantage test device and a dedicated isolated test mode. Heuristic findings require manual validation and a clean scan is not a security certification.
 
 ## Build
 Requires JDK 17 and Gradle 8.9.
