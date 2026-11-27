@@ -59,6 +59,7 @@ object ApkScanner {
         if (manifestFacts != null) findings += ManifestAuditor.audit(manifestFacts)
         findings += DexInventory.audit(dexFiles)
         findings += DependencyInventory.audit(dependencyMetadata)
+        val dependencies = DependencyInventory.parse(dependencyMetadata)
 
         val inspectedText = inspected.toString()
         findings += CryptoDependencyAuditor.audit(inspectedText, names)
@@ -93,6 +94,6 @@ object ApkScanner {
             "The passive checks did not identify configured indicators. This does not prove the APK is secure.",
             "Continue with dependency analysis, cryptographic review, and consented dynamic testing."
         )
-        return ScanReport(fileName, findings, entries)
+        return ScanReport(fileName, findings, entries, dependencies)
     }
 }
