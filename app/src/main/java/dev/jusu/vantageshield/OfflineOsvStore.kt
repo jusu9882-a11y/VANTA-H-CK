@@ -47,7 +47,7 @@ object OfflineOsvStore {
 
         if (!result.truncated) {
             result.packageMatches.forEach { (purl, ids) ->
-                require(purl.matches(Regex("pkg:maven/[A-Za-z0-9_.!~*'()-]+/[A-Za-z0-9_.!~*'()-]+@[A-Za-z0-9_.!~*'()-]+"))) {
+                require(purl.matches(Regex("pkg:maven/[A-Za-z0-9_.+!~*'()-]+/[A-Za-z0-9_.+!~*'()-]+@[A-Za-z0-9_.!~*'()-]+"))) {
                     "Invalid Maven package URL in OSV cache input."
                 }
                 packages.put(purl, JSONObject()
@@ -61,6 +61,15 @@ object OfflineOsvStore {
             require(record.optString("id") == id) { "OSV record ID mismatch in cache input." }
             records.put(id, record.toString())
         }
+
+        val referencedIds = mutableSetOf<String>()
+        val packageKeys = packages.keys()
+        while (packageKeys.hasNext()) {
+            val entry = packages.optJSONObject(packageKeys.next()) ?: continue
+            val ids = entry.optJSONArray("advisoryIds") ?: continue
+            for (index in 0 until ids.length()) ids.optString(index).takeIf(String::isNotBlank)?.let(referencedIds::add)
+        }
+        records.keys().asSequence().filterNot(referencedIds::contains).toList().forEach(records::remove)
 
         payload.put("schemaVersion", SCHEMA_VERSION)
             .put("source", "OSV.dev API over HTTPS")
