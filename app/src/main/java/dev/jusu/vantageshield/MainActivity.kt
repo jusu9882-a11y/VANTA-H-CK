@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
             if (showTerminal) {
                 TerminalConsole(
                     checks = checks,
+                    report = report,
                     onRefresh = { checks = DeviceChecks.run(this@MainActivity) },
                     onBack = { showTerminal = false }
                 )
