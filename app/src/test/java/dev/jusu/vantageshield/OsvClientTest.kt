@@ -30,6 +30,8 @@ class OsvClientTest {
         assertEquals("GHSA-abcd-1234-efgh", parsed.id)
         assertEquals(listOf("CVE-2026-12345"), parsed.aliases)
         assertEquals(1, parsed.references.size)
+        val matched = OsvClient.parseAdvisory(record, "fallback", listOf("pkg:maven/com.squareup.okhttp3/okhttp@4.12.0"))!!
+        assertEquals(listOf("pkg:maven/com.squareup.okhttp3/okhttp@4.12.0"), matched.matchedComponents)
         assertTrue(parsed.affected.single().contains("okhttp"))
         assertTrue(parsed.affected.single().contains("fixed 4.2.0"))
         assertTrue(parsed.affected.single().contains("ECOSYSTEM"))
