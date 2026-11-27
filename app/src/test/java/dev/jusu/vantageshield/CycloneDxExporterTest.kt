@@ -16,7 +16,7 @@ class CycloneDxExporterTest {
         assertTrue(json.contains("\"specVersion\": \"1.6\""))
         assertTrue(json.contains("\"purl\": \"pkg:maven/com.squareup.okhttp3/okhttp@4.12.0\""))
         assertTrue(json.contains("embedded META-INF/maven pom.properties"))
-        assertFalse(json.contains("DEX namespace"))
+        assertTrue(json.contains("DEX namespace heuristics are excluded"))
     }
 
     @Test fun emptyInventoryProducesValidEmptyComponentsArray() {
@@ -32,7 +32,7 @@ class CycloneDxExporterTest {
         val first = CycloneDxExporter.render(listOf(b, a, a))
         val second = CycloneDxExporter.render(listOf(a, b))
         assertEquals(first, second)
-        assertEquals(1, first.split("pkg:maven/org.example/alpha@1.0").size - 1)
+        assertEquals(1, first.split("\\\"name\\\": \\\"alpha\\\"").size - 1)
     }
 
     @Test fun escapesJsonControlCharactersAndQuotes() {
