@@ -30,6 +30,9 @@ class MainActivity : ComponentActivity() {
         var osvResult by remember { mutableStateOf<OsvCheckResult?>(null) }
         var osvError by remember { mutableStateOf<String?>(null) }
         var osvBusy by remember { mutableStateOf(false) }
+        var offlineResult by remember { mutableStateOf<OfflineOsvCheck?>(null) }
+        var offlineError by remember { mutableStateOf<String?>(null) }
+        var offlineBusy by remember { mutableStateOf(false) }
         var checks by remember { mutableStateOf(DeviceChecks.run(this)) }
         var busy by remember { mutableStateOf(false) }
         var showTerminal by remember { mutableStateOf(false) }
@@ -66,6 +69,8 @@ class MainActivity : ComponentActivity() {
                         report = result
                         osvResult = null
                         osvError = null
+                        offlineResult = null
+                        offlineError = null
                         message = "Scan completed. Validate findings before treating them as vulnerabilities."
                     } catch (e: Exception) {
                         message = "Scan failed: ${e.message ?: "unknown error"}"
@@ -148,7 +153,15 @@ class MainActivity : ComponentActivity() {
                                             osvResult = null
                                             scope.launch {
                                                 try {
-                                                    osvResult = withContext(Dispatchers.IO) { OsvClient.check(r.dependencies) }
+                                                    val result = withContext(Dispatchers.IO) { OsvClient.check(r.dependencies) }
+                                                    osvResult = result
+                                                    try {
+                                                        withContext(Dispatchers.IO) { OfflineOsvStore.merge(filesDir, result) }
+                                                        offlineError = null
+                                                    } catch (cacheException: Exception) {
+                                                        offlineError = "Online lookup succeeded, but cache update failed: " +
+                                                            (cacheException.message ?: "unknown error")
+                                                    }
                                                 } catch (e: Exception) {
                                                     osvError = e.message ?: "OSV lookup failed."
                                                 } finally { osvBusy = false }
@@ -158,7 +171,43 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier.fillMaxWidth()
                                     ) { Text(if (osvBusy) "CHECKING OSV…" else "CHECK OSV ADVISORIES (INTERNET)") }
                                     Text("This sends exact package names and versions to api.osv.dev. No APK, file contents, or personal data are uploaded.", style = MaterialTheme.typography.bodySmall)
-                                    if (osvBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                                    OutlinedButton(
+                                        onClick = {
+                                            offlineBusy = true
+                                            offlineError = null
+                                            offlineResult = null
+                                            scope.launch {
+                                                try {
+                                                    offlineResult = withContext(Dispatchers.IO) {
+                                                        OfflineOsvStore.check(filesDir, r.dependencies)
+                                                    }
+                                                } catch (e: Exception) {
+                                                    offlineError = e.message ?: "Offline cache lookup failed."
+                                                } finally { offlineBusy = false }
+                                            }
+                                        },
+                                        enabled = !busy && !osvBusy && !offlineBusy && r.dependencies.isNotEmpty(),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text(if (offlineBusy) "CHECKING LOCAL CACHE…" else "CHECK OFFLINE ADVISORY CACHE") }
+                                    Text("Offline cache covers only exact package versions previously checked online. It is not the full Maven vulnerability database.", style = MaterialTheme.typography.bodySmall)
+                                    if (offlineBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                                    offlineError?.let { Text("OFFLINE STATUS UNKNOWN • " + it, color = MaterialTheme.colorScheme.error) }
+                                    offlineResult?.let { cached ->
+                                        Text(
+                                            if (!cached.complete) "OFFLINE COVERAGE INCOMPLETE • \${cached.packagesChecked}/\${r.dependencies.distinctBy { it.purl }.size} exact package versions covered."
+                                            else "OFFLINE CACHE • \${cached.packagesChecked} exact package version(s) • checked \${cached.checkedAt}.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (!cached.complete || cached.stale) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                        )
+                                        if (cached.stale) Text("STALE CACHE • Older than 30 days or coverage is incomplete. Refresh online before relying on results.", style = MaterialTheme.typography.bodySmall)
+                                        if (cached.complete && cached.advisories.isEmpty()) Text("No matching advisory records in this cached coverage. This is not proof of safety.", style = MaterialTheme.typography.bodySmall)
+                                        cached.advisories.forEach { advisory ->
+                                            Text("CACHED • \${advisory.id}: \${advisory.summary}", style = MaterialTheme.typography.bodySmall)
+                                            if (advisory.matchedComponents.isNotEmpty()) Text("Matched: " + advisory.matchedComponents.joinToString(), style = MaterialTheme.typography.bodySmall)
+                                            advisory.references.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                                        }
+                                        Text("Local cache SHA-256: " + cached.cacheDigest, style = MaterialTheme.typography.labelSmall)
+                                    }
                                     osvError?.let { Text("OSV STATUS UNKNOWN • " + it, color = MaterialTheme.colorScheme.error) }
                                     osvResult?.let { result ->
                                         val summary = if (result.advisories.isEmpty()) "No matching advisories were returned; this is not proof of safety." else result.advisories.size.toString() + " advisory record(s) returned."
