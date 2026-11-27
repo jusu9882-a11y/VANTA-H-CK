@@ -2,6 +2,7 @@ package dev.jusu.vantageshield
 
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -44,13 +45,15 @@ object OfflineOsvStore {
         val packages = payload.optJSONObject("packages") ?: JSONObject()
         val records = payload.optJSONObject("records") ?: JSONObject()
 
-        result.packageMatches.forEach { (purl, ids) ->
-            require(purl.matches(Regex("pkg:maven/[A-Za-z0-9_.!~*'()-]+/[A-Za-z0-9_.!~*'()-]+@[A-Za-z0-9_.!~*'()-]+"))) {
-                "Invalid Maven package URL in OSV cache input."
+        if (!result.truncated) {
+            result.packageMatches.forEach { (purl, ids) ->
+                require(purl.matches(Regex("pkg:maven/[A-Za-z0-9_.!~*'()-]+/[A-Za-z0-9_.!~*'()-]+@[A-Za-z0-9_.!~*'()-]+"))) {
+                    "Invalid Maven package URL in OSV cache input."
+                }
+                packages.put(purl, JSONObject()
+                    .put("checkedAt", result.checkedAt)
+                    .put("advisoryIds", org.json.JSONArray(ids.distinct().sorted())))
             }
-            packages.put(purl, JSONObject()
-                .put("checkedAt", result.checkedAt)
-                .put("advisoryIds", org.json.JSONArray(ids.distinct().sorted())))
         }
         result.rawAdvisories.forEach { (id, raw) ->
             require(id.matches(Regex("[A-Za-z0-9._-]{1,128}")))
@@ -75,10 +78,10 @@ object OfflineOsvStore {
 
         if (!directory.exists() && !directory.mkdirs()) error("Unable to create the offline cache directory.")
         val temp = File(directory, "$FILE_NAME.tmp")
-        temp.outputStream().use { stream ->
+        FileOutputStream(temp).use { stream ->
             stream.write(bytes)
             stream.flush()
-            (stream as? java.io.FileOutputStream)?.fd?.sync()
+            stream.fd.sync()
         }
         try {
             Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
