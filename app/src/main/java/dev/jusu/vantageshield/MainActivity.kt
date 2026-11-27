@@ -94,8 +94,8 @@ class MainActivity : ComponentActivity() {
                     ) {
                         item {
                             Text("VANTAGE SHIELD", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-                            Text("OFFLINE ANDROID SECURITY LAB", style = MaterialTheme.typography.labelMedium)
-                            Text("Independent assessment • Local analysis • No cloud upload", style = MaterialTheme.typography.bodySmall)
+                            Text("LOCAL APK ANALYSIS • OPTIONAL OSV LOOKUP", style = MaterialTheme.typography.labelMedium)
+                            Text("APK stays local • Optional version-only query to OSV.dev", style = MaterialTheme.typography.bodySmall)
                             Spacer(Modifier.height(8.dp))
                             OutlinedButton(onClick = { showTerminal = true }, modifier = Modifier.fillMaxWidth()) {
                                 Text("> OPEN TERMINAL")
@@ -121,6 +121,8 @@ class MainActivity : ComponentActivity() {
                                     Card { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                         Text("OSV • " + advisory.id, style = MaterialTheme.typography.titleMedium)
                                         Text(advisory.summary)
+                                        advisory.severity?.let { Text("CVSS: " + it, style = MaterialTheme.typography.bodySmall) }
+                                        advisory.affected.forEach { Text("Affected: " + it, style = MaterialTheme.typography.bodySmall) }
                                         if (advisory.aliases.isNotEmpty()) Text("Aliases: " + advisory.aliases.joinToString())
                                         advisory.modified?.let { Text("Last modified: " + it, style = MaterialTheme.typography.bodySmall) }
                                         advisory.references.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
