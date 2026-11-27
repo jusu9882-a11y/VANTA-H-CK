@@ -25,8 +25,9 @@ class ApkScannerTest {
         val r = ApkScanner.scan(archive("assets/readme.txt" to "hello").inputStream(), "test.apk")
         assertTrue(r.findings.any { it.title == "No DEX bytecode found" })
     }
-    @Test fun cleanHeuristicIsExplicitlyInformational() {
+    @Test fun malformedDexIsReportedAsUnavailableNotClean() {
         val r = ApkScanner.scan(archive("classes.dex" to "secure endpoint").inputStream(), "test.apk")
-        assertEquals(Severity.INFO, r.findings.single().severity)
+        assertTrue(r.findings.any { it.title == "DEX structure unavailable" && it.severity == Severity.LOW })
+        assertTrue(r.findings.none { it.severity == Severity.HIGH || it.severity == Severity.CRITICAL })
     }
 }
