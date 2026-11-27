@@ -32,6 +32,23 @@ class MainActivity : ComponentActivity() {
         var showTerminal by remember { mutableStateOf(false) }
         var message by remember { mutableStateOf("Select the Vantage APK to start a local assessment.") }
         val scope = rememberCoroutineScope()
+        val sbomExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.cyclonedx+json")) { uri: Uri? ->
+            if (uri != null) {
+                val dependencies = report?.dependencies.orEmpty()
+                scope.launch {
+                    try {
+                        val json = CycloneDxExporter.render(dependencies)
+                        withContext(Dispatchers.IO) {
+                            contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(json) }
+                                ?: error("Unable to create the SBOM document.")
+                        }
+                        message = "CycloneDX SBOM exported: ${dependencies.size} verified Maven component(s)."
+                    } catch (e: Exception) {
+                        message = "SBOM export failed: ${e.message ?: "unknown error"}"
+                    }
+                }
+            }
+        }
         val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
             if (uri != null) {
                 busy = true
@@ -99,6 +116,12 @@ class MainActivity : ComponentActivity() {
                                     Text("ASSESSMENT RESULTS", style = MaterialTheme.typography.titleLarge)
                                     Text(r.fileName)
                                     Text("${r.inspectedEntries} archive entries inspected • ${r.riskCount} review findings")
+                                    Text("${r.dependencies.size} exact Maven coordinates available for SBOM export", style = MaterialTheme.typography.bodySmall)
+                                    OutlinedButton(
+                                        onClick = { sbomExporter.launch("vantage-shield-sbom.json") },
+                                        enabled = !busy,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("EXPORT CYCLONEDX SBOM") }
                                 } }
                             }
                             items(r.findings) { f ->
