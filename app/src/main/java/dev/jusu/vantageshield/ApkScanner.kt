@@ -1,11 +1,12 @@
 package dev.jusu.vantageshield
 
 import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.Locale
 import java.util.zip.ZipInputStream
 
-/** Passive offline APK archive triage; not a complete manifest or bytecode auditor. */
+/** Passive offline APK triage. Manifest findings are based on decoded binary XML when available. */
 object ApkScanner {
     private const val MAX_ENTRY_BYTES = 32L * 1024 * 1024
     private const val MAX_TOTAL_BYTES = 128L * 1024 * 1024
@@ -14,6 +15,7 @@ object ApkScanner {
         val findings = mutableListOf<Finding>()
         val names = mutableSetOf<String>()
         val inspected = StringBuilder()
+        val manifestOutput = ByteArrayOutputStream()
         var total = 0L
         var entries = 0
         ZipInputStream(BufferedInputStream(input)).use { zip ->
@@ -22,7 +24,8 @@ object ApkScanner {
                 entries++
                 names += entry.name
                 if (entry.isDirectory) continue
-                val capture = entry.name == "AndroidManifest.xml" || entry.name.endsWith(".dex")
+                val isManifest = entry.name == "AndroidManifest.xml"
+                val capture = isManifest || entry.name.endsWith(".dex")
                 var entryBytes = 0L
                 val buffer = ByteArray(8192)
                 while (true) {
@@ -34,14 +37,20 @@ object ApkScanner {
                         "APK inspection limit exceeded; archive may be unusually large."
                     }
                     if (capture) inspected.append(String(buffer, 0, n, Charsets.ISO_8859_1))
+                    if (isManifest) manifestOutput.write(buffer, 0, n)
                 }
                 zip.closeEntry()
             }
         }
+
+        val manifestFacts = if (manifestOutput.size() > 0) BinaryManifestReader.read(manifestOutput.toByteArray()) else null
+        if (manifestFacts != null) findings += ManifestAuditor.audit(manifestFacts)
+
         val lower = inspected.toString().lowercase(Locale.ROOT)
-        if ("usescleartexttraffic" in lower || "cleartexttraffic" in lower) findings += Finding(
+        if (manifestFacts?.usesCleartextTraffic == null &&
+            ("usescleartexttraffic" in lower || "cleartexttraffic" in lower)) findings += Finding(
             "Cleartext traffic configuration indicator", Severity.MEDIUM,
-            "Manifest-related bytes contain a cleartext-traffic marker; binary XML decoding is needed to confirm the value.",
+            "Manifest-related bytes contain a cleartext-traffic marker; the value could not be decoded and confirmed.",
             "Decode AndroidManifest.xml and ensure cleartext traffic is disabled except for explicitly justified domains."
         )
         if ("http://" in lower) findings += Finding(
@@ -65,8 +74,8 @@ object ApkScanner {
         )
         if (findings.isEmpty()) findings += Finding(
             "No high-signal indicators detected", Severity.INFO,
-            "The passive heuristics did not identify configured indicators. This does not prove the APK is secure.",
-            "Continue with decoded-manifest review, dependency analysis, cryptographic review, and consented dynamic testing."
+            "The passive checks did not identify configured indicators. This does not prove the APK is secure.",
+            "Continue with dependency analysis, cryptographic review, and consented dynamic testing."
         )
         return ScanReport(fileName, findings, entries)
     }
