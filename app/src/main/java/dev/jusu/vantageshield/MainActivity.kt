@@ -167,7 +167,7 @@ class MainActivity : ComponentActivity() {
                                                 } finally { osvBusy = false }
                                             }
                                         },
-                                        enabled = !busy && !osvBusy && r.dependencies.isNotEmpty(),
+                                        enabled = !busy && !osvBusy && !offlineBusy && r.dependencies.isNotEmpty(),
                                         modifier = Modifier.fillMaxWidth()
                                     ) { Text(if (osvBusy) "CHECKING OSV…" else "CHECK OSV ADVISORIES (INTERNET)") }
                                     Text("This sends exact package names and versions to api.osv.dev. No APK, file contents, or personal data are uploaded.", style = MaterialTheme.typography.bodySmall)
