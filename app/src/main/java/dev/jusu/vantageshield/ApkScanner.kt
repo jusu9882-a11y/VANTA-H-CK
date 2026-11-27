@@ -25,7 +25,7 @@ object ApkScanner {
                 names += entry.name
                 if (entry.isDirectory) continue
                 val isManifest = entry.name == "AndroidManifest.xml"
-                val capture = isManifest || entry.name.endsWith(".dex")
+                val capture = isManifest || entry.name.endsWith(".dex") || entry.name.endsWith(".so") ||\n                    (entry.name.startsWith("META-INF/") && (entry.name.endsWith(".version", true) ||\n                        entry.name.endsWith("pom.properties", true) || entry.name.endsWith("pom.xml", true)))
                 var entryBytes = 0L
                 val buffer = ByteArray(8192)
                 while (true) {
@@ -46,7 +46,7 @@ object ApkScanner {
         val manifestFacts = if (manifestOutput.size() > 0) BinaryManifestReader.read(manifestOutput.toByteArray()) else null
         if (manifestFacts != null) findings += ManifestAuditor.audit(manifestFacts)
 
-        val lower = inspected.toString().lowercase(Locale.ROOT)
+        val inspectedText = inspected.toString()\n        findings += CryptoDependencyAuditor.audit(inspectedText, names)\n        val lower = inspectedText.lowercase(Locale.ROOT)
         if (manifestFacts?.usesCleartextTraffic == null &&
             ("usescleartexttraffic" in lower || "cleartexttraffic" in lower)) findings += Finding(
             "Cleartext traffic configuration indicator", Severity.MEDIUM,
