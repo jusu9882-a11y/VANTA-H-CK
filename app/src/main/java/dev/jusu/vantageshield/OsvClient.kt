@@ -14,6 +14,7 @@ data class OsvAdvisory(
     val aliases: List<String>,
     val references: List<String>,
     val affected: List<String>,
+    val matchedComponents: List<String>,
     val severity: String?
 )
 
@@ -53,25 +54,27 @@ object OsvClient {
             ?: error("OSV response did not contain a results array.")
         require(results.length() == selected.size) { "OSV returned an unexpected result count." }
 
-        val ids = linkedSetOf<String>()
+        val matches = linkedMapOf<String, LinkedHashSet<String>>()
         for (i in 0 until results.length()) {
             val vulns = results.optJSONObject(i)?.optJSONArray("vulns") ?: continue
             for (j in 0 until vulns.length()) {
                 val id = vulns.optJSONObject(j)?.optString("id").orEmpty()
-                if (id.matches(Regex("[A-Za-z0-9._-]{1,128}"))) ids += id
+                if (id.matches(Regex("[A-Za-z0-9._-]{1,128}"))) {
+                    matches.getOrPut(id) { linkedSetOf() }.add(selected[i].purl)
+                }
             }
         }
 
-        val truncated = unique.size > MAX_PACKAGES || ids.size > MAX_ADVISORIES
-        val advisories = ids.take(MAX_ADVISORIES).mapNotNull { id ->
-            parseAdvisory(request(VULN_URL + id, "GET", null), id)
+        val truncated = unique.size > MAX_PACKAGES || matches.size > MAX_ADVISORIES
+        val advisories = matches.keys.take(MAX_ADVISORIES).mapNotNull { id ->
+            parseAdvisory(request(VULN_URL + id, "GET", null), id, matches[id].orEmpty().toList())
         }.distinctBy { it.id }.sortedBy { it.id }
 
         return OsvCheckResult(Instant.now().toString(), selected.size, advisories, truncated)
     }
 
 
-    internal fun parseAdvisory(record: JSONObject, fallbackId: String): OsvAdvisory? {
+    internal fun parseAdvisory(record: JSONObject, fallbackId: String, matchedComponents: List<String> = emptyList()): OsvAdvisory? {
         if (record.has("withdrawn") && !record.isNull("withdrawn")) return null
         val affected = record.optJSONArray("affected")
         val affectedSummary = if (affected == null) emptyList() else
@@ -85,13 +88,13 @@ object OsvClient {
                     (0 until versionList.length()).map { versionList.optString(it) }.filter(String::isNotBlank).take(12)
                 val rangeList = item.optJSONArray("ranges")
                 val rangeEvidence = if (rangeList == null) emptyList() else
-                    (0 until rangeList.length()).mapNotNull { rangeIndex ->
-                        val range = rangeList.optJSONObject(rangeIndex) ?: return@mapNotNull null
+                    (0 until rangeList.length()).mapNotNull rangeLoop@ { rangeIndex ->
+                        val range = rangeList.optJSONObject(rangeIndex) ?: return@rangeLoop null
                         val type = range.optString("type")
                         val events = range.optJSONArray("events")
                         val eventText = if (events == null) emptyList() else
-                            (0 until events.length()).mapNotNull { eventIndex ->
-                                val event = events.optJSONObject(eventIndex) ?: return@mapNotNull null
+                            (0 until events.length()).mapNotNull eventLoop@ { eventIndex ->
+                                val event = events.optJSONObject(eventIndex) ?: return@eventLoop null
                                 listOf("introduced", "fixed", "last_affected", "limit")
                                     .firstNotNullOfOrNull { key -> event.optString(key).takeIf(String::isNotBlank)?.let { key + " " + it } }
                             }
@@ -117,6 +120,7 @@ object OsvClient {
             aliases = aliases,
             references = references,
             affected = affectedSummary,
+            matchedComponents = matchedComponents,
             severity = severityValues.firstOrNull()
         )
     }
