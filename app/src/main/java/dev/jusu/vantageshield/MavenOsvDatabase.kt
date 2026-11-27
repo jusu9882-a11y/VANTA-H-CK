@@ -116,18 +116,22 @@ object MavenOsvDatabase {
             val metadataBackup = File(directory, "$META.previous")
             archiveBackup.delete()
             metadataBackup.delete()
+            var installedArchive = false
+            var installedMetadata = false
             try {
                 if (target.exists() && !target.renameTo(archiveBackup)) error("Cannot preserve the previous Maven database snapshot.")
                 if (metadataTarget.exists() && !metadataTarget.renameTo(metadataBackup)) error("Cannot preserve the previous Maven database metadata.")
                 Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                installedArchive = true
                 Files.move(metaTemp.toPath(), metadataTarget.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                installedMetadata = true
                 val verified = status(directory)
                 archiveBackup.delete()
                 metadataBackup.delete()
                 return verified
             } catch (e: Exception) {
-                target.delete()
-                metadataTarget.delete()
+                if (installedArchive) target.delete()
+                if (installedMetadata) metadataTarget.delete()
                 if (archiveBackup.exists()) archiveBackup.renameTo(target)
                 if (metadataBackup.exists()) metadataBackup.renameTo(metadataTarget)
                 throw e
