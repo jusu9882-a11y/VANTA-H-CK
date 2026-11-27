@@ -43,7 +43,7 @@ class OsvClientTest {
     }
 
     @Test fun missingOptionalFieldsRemainSafeAndExplicit() {
-        val parsed = OsvClient.parseAdvisory(JSONObject("""{"id":"OSV-EMPTY"}""), "fallback")!!
+        val parsed = OsvClient.parseAdvisory(JSONObject("""{"id":"OSV-EMPTY"}"""), "fallback")!!
         assertEquals("OSV-EMPTY", parsed.id)
         assertEquals("No summary supplied by OSV.", parsed.summary)
         assertTrue(parsed.aliases.isEmpty())
