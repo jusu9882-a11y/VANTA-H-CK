@@ -8,11 +8,15 @@ Standalone Android security assessment tool for the Vantage application.
 - Structurally validate DEX headers, string/type/class tables, and inventory recognizable library namespaces from actual class definitions (for example OkHttp, Retrofit, Gson, Kotlin, AndroidX, and Bouncy Castle). Invalid DEX-like entries are reported as unavailable rather than silently trusted.
 - Decode the compiled Android binary manifest using an in-app parser and audit application flags, SDK target, declared permissions, and exported activities, services, receivers, providers, and aliases.
 - Recover exact Maven group/artifact/version coordinates when an APK embeds matching `META-INF/maven/**/pom.properties` files; validate the metadata path against the declared coordinates, bound metadata size, and deduplicate coordinates. Emit Maven Package URLs as SBOM inputs.
+- Export a CycloneDX 1.6 JSON SBOM through Android’s document picker. The export includes only validated embedded Maven coordinates, records the evidence source and metadata path, sorts and deduplicates components, and excludes DEX namespace-only heuristics. An empty inventory produces an empty component list, not guessed dependencies.
 - Perform cautious string-level cryptography/TLS triage for weak-algorithm and certificate-validation markers; identify bundled native libraries and dependency metadata as inventory leads.
 - Show severity, evidence, and remediation guidance for findings.
 - Run local Android device posture checks for API level, developer-options state (where readable), and Bluetooth/Wi-Fi adapter state.
 - Open the built-in **SHIELD TERMINAL** for app-specific commands (`help`, `status`, `device`, `scan`, `findings`, `refresh`, `version`, `clear`, `exit`) and real read-only Android diagnostics (`id`, `whoami`, `uname`, `uptime`, `df`, `ps`, `ip addr`, `ip route`, and approved `getprop` values).
 - Offline operation; the APK is analyzed locally and never uploaded.
+
+## SBOM scope and limitations
+The CycloneDX export is an evidence-backed partial inventory, not a complete dependency graph. It only includes exact coordinates recovered from matching embedded Maven `pom.properties`; many Android libraries omit this metadata, so absence from the SBOM does not mean absence from the APK. DEX namespace recognition is intentionally not treated as an exact package/version. The export does not itself match CVEs or advisories.
 
 ## Manifest audit scope and limitations
 The binary XML reader extracts common manifest string and typed attributes. Current rules flag release debuggability, cleartext traffic explicitly enabled, backup enabled, older target SDK values, and exported components without a component-level permission. Exported status alone is not proof of a vulnerability. Findings are triage signals and require manual review. Resource references, manifest-merger provenance, network security configuration contents, SDK-specific component semantics, and all permission protection levels are not yet fully resolved. A manifest that cannot be decoded is not silently treated as clean.
